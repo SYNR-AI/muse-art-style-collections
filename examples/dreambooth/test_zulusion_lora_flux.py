@@ -226,13 +226,22 @@ def parse_args():
     if args.prompts_jsonl_path is not None:
         # print(f" -- NotImplemented ... please use `--prompts`")
         assert args.prompts_jsonl_key is not None
-        with open(args.prompts_jsonl_path, 'r') as f:
-            args.prompts = []
-            for line in f.readlines():
-                jo = json.loads(line)
-                pm = ", ".join(jo.get(args.prompts_jsonl_key, []))
-                args.prompts.append(pm)
-            print(f" -- Load prompts from `jsonl` file: {args.prompts_jsonl_path}")
+        if args.prompts_jsonl_path.endswith(".json"):
+            # it's a json file, instead of jsonl file
+            with open(args.prompts_jsonl_path, 'r') as f:
+                args.prompts = []
+                js = json.load(f)
+                for line in js:
+                    args.prompts.append(line.get(args.prompts_jsonl_key, ""))
+                print(f" -- Load prompts from `json` file: {args.prompts_jsonl_path}")
+        else:
+            with open(args.prompts_jsonl_path, 'r') as f:
+                args.prompts = []
+                for line in f.readlines():
+                    jo = json.loads(line)
+                    pm = ", ".join(jo.get(args.prompts_jsonl_key, []))
+                    args.prompts.append(pm)
+                print(f" -- Load prompts from `jsonl` file: {args.prompts_jsonl_path}")
         # skip save_mode=matplotlib
         args.save_plot = False
     elif args.prompts_text_path is not None:
@@ -282,7 +291,10 @@ def main(args):
     elif args.flux_model_precision == "fp8":
         # assert args.flux_transformer_fp8_path is not None
         assert os.path.exists(args.flux_transformer_fp8_path)
+
         _TXX = time.perf_counter()
+        from dotenv import load_dotenv
+        load_dotenv() # s.t. load HF_TOKEN,HF_ENDPOINT,... other envs
         _transformer = FluxTransformer2DModel.from_single_file(
             args.flux_transformer_fp8_path,
             torch_dtype=torch.bfloat16).to("cuda")

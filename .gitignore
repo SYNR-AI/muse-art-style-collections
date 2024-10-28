@@ -1,8 +1,8 @@
-__pycache__/
+.env
 
+__pycache__/
 examples/dreambooth/example_images/
 examples/dreambooth/example_images_filtered/
-
 !examples/dreambooth/example_images_filtered/train_TK01ANIM.sh
 !examples/dreambooth/example_images_filtered/train_TK02GALX.sh
 !examples/dreambooth/example_images_filtered/train_MS02SKTC.sh
