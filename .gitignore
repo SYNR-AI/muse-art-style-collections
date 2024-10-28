@@ -1,0 +1,9 @@
+__pycache__/
+
+examples/dreambooth/example_images/
+examples/dreambooth/example_images_filtered/
+examples/dreambooth/example_prompts/
+examples/dreambooth/test_style_transfer*
+examples/dreambooth/trained-*
+examples/dreambooth/uploaded/
+examples/dreambooth/visual-results/
