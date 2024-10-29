@@ -8,7 +8,7 @@ import random
 import numpy as np
 
 from diffusers import FluxPipeline, FluxImg2ImgPipeline
-from zulusion.pipline_flux_img2img_cfg import FluxImg2ImgCFGPipeline
+from zulusion.pipeline_flux_img2img_cfg import FluxImg2ImgCFGPipeline
 from PIL import Image
 print(f" -- import modules, time cost: {time.perf_counter() - _TIC}")
 

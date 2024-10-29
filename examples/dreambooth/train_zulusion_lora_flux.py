@@ -403,6 +403,12 @@ def parse_args(input_args=None):
         help=("The dimension of the LoRA update matrices."),
     )
     parser.add_argument(
+        "--network_lora_target_modules",
+        choices=["attn_only", "attn_w_linear"],
+        default="attn_only", # diffusers defaults
+        help=("To which modules we want to register low-rank adaptations on, default is attn for both text_encoder and transformer."),
+    )
+    parser.add_argument(
         "--with_prior_preservation",
         default=False,
         action="store_true",
@@ -1467,19 +1473,37 @@ def main(args):
             text_encoder_one.gradient_checkpointing_enable()
 
     # now we will add new LoRA weights to the attention layers
+    transformer_lora_target_modules = ["to_k", "to_q", "to_v", "to_out.0"]
+    if args.network_lora_target_modules == "attn_w_linear":
+        transformer_lora_target_modules = [
+            # single_transformer_blocks:
+            "norm.linear", "proj_mlp", "proj_out",
+            # transformer_blocks:
+            "norm1.linear", "norm1_context.linear",
+            "ff.net.0.proj", "ff.net.2", "ff_context.net.0.proj", "ff_context.net.2",
+            # common:
+            "attn.to_q", "attn.to_k", "attn.to_v", "attn.to_out.0",
+            "attn.add_q_proj", "attn.add_k_proj", "attn.add_v_proj", "attn.to_add_out",
+        ]
     transformer_lora_config = LoraConfig(
         r=args.rank,
         lora_alpha=args.rank,
         init_lora_weights="gaussian",
-        target_modules=["to_k", "to_q", "to_v", "to_out.0"],
+        target_modules=transformer_lora_target_modules,
     )
     transformer.add_adapter(transformer_lora_config)
     if args.train_text_encoder:
+        text_encoder_one_lora_target_modules = ["q_proj", "k_proj", "v_proj", "out_proj"]
+        if args.network_lora_target_modules == "attn_w_linear":
+            text_encoder_one_lora_target_modules = [
+                "self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.out_proj",
+                "mlp.fc1", "mlp.fc2",
+            ]
         text_lora_config = LoraConfig(
             r=args.rank,
             lora_alpha=args.rank,
             init_lora_weights="gaussian",
-            target_modules=["q_proj", "k_proj", "v_proj", "out_proj"],
+            target_modules=text_encoder_one_lora_target_modules,
         )
         text_encoder_one.add_adapter(text_lora_config)
 

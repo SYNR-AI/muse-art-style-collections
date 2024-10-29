@@ -4,6 +4,7 @@ import random
 import time
 
 import matplotlib.pyplot as plt
+import pandas as pd
 import numpy as np
 import json
 import torch
@@ -148,11 +149,15 @@ def parse_args():
     parser.add_argument("--prompts", type=str, nargs='+', default=PROMPTS,
                         help="Prompts, if nothing provided, use default prompt-sentence(s)")
     parser.add_argument("--prompts_jsonl_path", type=str, default=None,
-                        help="Prompts will be loaded from this .csv file, by column name=`situation`")
+                        help="Prompts will be loaded from this .jsonl(.json) file, by column name=`jsonl_key`")
     parser.add_argument("--prompts_jsonl_key", type=str, default=None,
                         help="Prompts items will be loaded by this column, must be used with `prompts_jsonl_path`")
     parser.add_argument("--prompts_text_path", type=str, default=None,
                         help="Prompts will be loaded from this .txt file, each line one prompt")
+    parser.add_argument("--prompts_csv_path", type=str, default=None,
+                        help="Prompts will be loaded from this .csv file, by column name=`csv_key`")
+    parser.add_argument("--prompts_csv_key", type=str, default=None,
+                        help="Prompts items will be loaded by this column, must be used with `prompts_csv_path`")
     parser.add_argument("--extra_triggers", type=str, default=None,
                         help="Style hints, as part of prompt prefix")
     parser.add_argument("--seed", type=int, default=42,
@@ -251,6 +256,16 @@ def parse_args():
             for line in f.readlines():
                 args.prompts.append(line.strip())
             print(f" -- Load prompts from `txt` file: {args.prompts_text_path}")
+        args.save_plot = False
+    elif args.prompts_csv_path is not None:
+        assert os.path.exists(args.prompts_csv_path)
+        _df = pd.read_csv(args.prompts_csv_path)
+        assert args.prompts_csv_key in _df.columns
+        args.prompts = []
+        for line in _df[args.prompts_csv_key]:
+            line.replace('\n', ' ')
+            args.prompts.append(line)
+        print(f" -- Load prompts from `csv` file: {args.prompts_csv_path}")
         args.save_plot = False
     else:
         args.save_plot = True

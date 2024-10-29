@@ -3,11 +3,7 @@
 __pycache__/
 examples/dreambooth/example_images/
 examples/dreambooth/example_images_filtered/
-!examples/dreambooth/example_images_filtered/train_TK01ANIM.sh
-!examples/dreambooth/example_images_filtered/train_TK02GALX.sh
-!examples/dreambooth/example_images_filtered/train_MS02SKTC.sh
-!examples/dreambooth/example_images_filtered/train_MS03ANIM.sh
-!examples/dreambooth/example_images_filtered/train_MS04REAL.sh
+!examples/dreambooth/example_images_filtered/*.sh
 
 examples/dreambooth/example_prompts/
 examples/dreambooth/test_style_transfer*

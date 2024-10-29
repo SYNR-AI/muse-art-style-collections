@@ -17,7 +17,7 @@ CUDA_VISIBLE_DEVICES=${CUDA_DEVICES} python -u \
     --num_images_per_prompt 4 \
     --separate_save \
     --lora_path "${LORA_PATH}" \
-    --lora_scale 0.8 \
+    --lora_scale 0.6 \
     --out_dir "${OUT_DIR}" \
     --num_inference_steps 20 \
     --guidance_scale 3.5 \

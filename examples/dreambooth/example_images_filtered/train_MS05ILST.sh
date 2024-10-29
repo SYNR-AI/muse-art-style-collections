@@ -5,7 +5,7 @@
 CUDA_DEVICES="${1:-0,1,2,3,4,5,6,7}"
 NUM_PROCESSES=${2:-8}
 MAIN_PROCESS_PORT="${3:-31190}"
-TRIGGER="TK01ANIM"
+TRIGGER="MS05ILST"
 
 set -x
 cd ..
@@ -18,8 +18,8 @@ export DATASET_PATH="./example_images_filtered/${TRIGGER}"
 # -------------------------------------------------------------------------------------------
 export OUTPUT_DIR="./trained-flux-lora-exp11/data-v2/${TRIGGER}"
 
-export _MAX_STEPS=4000
-export _CKPT_STEPS=500
+export _MAX_STEPS=8000
+export _CKPT_STEPS=1000
 export _RESOLUTION=512 # dummy!!
 export _BATCH_SIZE=2
 # cuda-memory: 1024*1024*1 ~ 68GB
@@ -28,9 +28,9 @@ export _BATCH_SIZE=2
 
 # export _REPEATS=1
 # export _LR=1e-4
-# export _REPEATS=4
+# export _REPEATS=2
 # export _LR=5e-4
-export _REPEATS=6
+export _REPEATS=2
 export _LR=1e-4
 
 export _INSTANCE_PROMPT=$TRIGGER
