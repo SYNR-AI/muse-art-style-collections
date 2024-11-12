@@ -504,6 +504,16 @@ def parse_args(input_args=None):
         ),
     )
     parser.add_argument(
+        "--resume_from_checkpoint_sft",
+        type=str,
+        default=None,
+        help=(
+            "Whether training should be resumed from a previous checkpoint. Notice we only save the"
+            " transformer and text_encoder lora, and never save the entire transformer or other optimizers,"
+            " since they are fxxking too big."
+        ),
+    )
+    parser.add_argument(
         "--gradient_accumulation_steps",
         type=int,
         default=1,
@@ -911,10 +921,9 @@ class DreamBoothDataset(Dataset):
                     else:
                         raise FileNotFoundError(f"No caption file found: {path.stem} (.json|.txt)")
                 if self.shuffle_captions:
-                    warnings.warn("Shuffling captions is enabled, please be aware " \
-                                  "that it can only be used for tags-format captions, " \
-                                  "and self.custom_instance_prompts will record a list of none empty strings " \
-                                  "instead of the original caption string")
+                    warnings.warn(
+                        "Shuffling captions is enabled, please be aware that it can only be used for tags-format captions, and " \
+                        "self.custom_instance_prompts will record a list of none empty strings instead of the original caption string")
                     caption = [item.strip() for item in caption.split(',') if item.strip()]
                 custom_instance_prompts.append(caption)
 
@@ -1047,8 +1056,14 @@ class DreamBoothDataset(Dataset):
         if self.custom_instance_prompts and (caption := self.custom_instance_prompts[index % self.num_instance_images]):
             if self.shuffle_captions:
                 # shuffle caption list, and join str list -> str
-                assert isinstance(caption, list), " __ if shuffle_captions, then caption here must be list of str"
-                if self._trigger:
+                # assume to shuffle trigger as well
+                assert isinstance(caption, list), " -- if shuffle_captions, then caption here must be list of str"
+                # if do_shuffle_captions_with_trigger and self._trigger and len(example_instance_prompts_list) > 0:
+                if self._trigger and len(example_instance_prompts_list) > 0:
+                    ### NOTICE:
+                    # if we do not pop it, then the trigger will be added twice
+                    # once at the head, once in the shuffled result
+                    example_instance_prompts_list.pop()
                     caption = self._trigger_sep_list + caption
                 sep_i = max(0, min(self.keep_n_tokens, len(caption)))
                 tail_c = caption[sep_i:]
@@ -1554,6 +1569,8 @@ def main(args):
         transformer_state_dict = {
             f'{k.replace("transformer.", "")}': v for k, v in lora_state_dict.items() if k.startswith("transformer.")
         }
+        print(f" -- Loading adapter weights #key-value pair(s) = {len(lora_state_dict)}, from path: {input_dir}")
+        print(f"    where transformer_state_dict #key-value pair(s) = {len(transformer_state_dict)}")
         transformer_state_dict = convert_unet_state_dict_to_peft(transformer_state_dict)
         incompatible_keys = set_peft_model_state_dict(transformer_, transformer_state_dict, adapter_name="default")
         if incompatible_keys is not None:
@@ -1869,6 +1886,7 @@ def main(args):
     # The trackers initializes automatically on the main process.
     if accelerator.is_main_process:
         tracker_name = "dreambooth-flux-dev-lora"
+        args.num_processes = accelerator.num_processes
         accelerator.init_trackers(tracker_name, config=vars(args))
 
     # Train!
@@ -1913,6 +1931,15 @@ def main(args):
     else:
         initial_global_step = 0
 
+    if args.resume_from_checkpoint_sft is not None and \
+        os.path.exists(args.resume_from_checkpoint_sft):
+        models_to_resume = [transformer]
+        if args.train_text_encoder:
+            models_to_resume.extend([text_encoder_one])
+        load_model_hook(
+            models=models_to_resume,
+            input_dir=args.resume_from_checkpoint_sft)
+
     progress_bar = tqdm(
         range(0, args.max_train_steps),
         initial=initial_global_step,
@@ -1953,6 +1980,7 @@ def main(args):
                 models_to_accumulate.extend([text_encoder_one])
             with accelerator.accumulate(models_to_accumulate):
                 prompts = batch["prompts"]
+                # print("[in-training] prompts:", prompts)
 
                 # encode batch prompts when custom prompts are provided for each image -
                 if train_dataset.custom_instance_prompts:
