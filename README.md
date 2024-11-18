@@ -3,7 +3,7 @@
 This repo is adopted from [diffusers/examples/dreambooth](https://github.com/huggingface/diffusers/tree/main/examples/dreambooth).  
 
 Usage:  
-```base
+```bash
 
 cd examples/dreambooth/
 
