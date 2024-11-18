@@ -1,4 +1,4 @@
-# Museland Art-Style LoRA Training Scripts
+# Museland Art Style LoRA Training Scripts
 
 This repo is adopted from [diffusers/examples/dreambooth](https://github.com/huggingface/diffusers/tree/main/examples/dreambooth).  
 

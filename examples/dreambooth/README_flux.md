@@ -182,6 +182,7 @@ the exact modules for LoRA training. Here are some examples of target modules yo
 > `--lora_layers` can also be used to specify which **blocks** to apply LoRA training to. To do so, simply add a block prefix to each layer in the comma seperated string:
 > **single DiT blocks**: to target the ith single transformer block, add the prefix `single_transformer_blocks.i`, e.g. - `single_transformer_blocks.i.attn.to_k`
 > **MMDiT blocks**: to target the ith MMDiT block, add the prefix `transformer_blocks.i`, e.g. - `transformer_blocks.i.attn.to_k` 
+
 > [!NOTE]
 > keep in mind that while training more layers can improve quality and expressiveness, it also increases the size of the output LoRA weights.
 
