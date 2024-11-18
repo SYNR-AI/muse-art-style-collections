@@ -8,8 +8,10 @@ MAIN_PROCESS_PORT="${3:-31190}"
 TRIGGER="MU01ANIM"
 
 set -x
-cd ..
-echo "Change workspace ..."
+# cd ..
+# echo "Change workspace ..."
+
+echo "Current workspace: ..."
 echo `pwd`
 
 export MODEL_PATH="/mnt2/share/huggingface_models/FLUX.1-dev"

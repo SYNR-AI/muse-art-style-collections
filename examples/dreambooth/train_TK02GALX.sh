@@ -5,18 +5,20 @@
 CUDA_DEVICES="${1:-0,1,2,3,4,5,6,7}"
 NUM_PROCESSES=${2:-8}
 MAIN_PROCESS_PORT="${3:-31190}"
-TRIGGER="MS03ANIM"
+TRIGGER="TK02GALX"
 
 set -x
-cd ..
-echo "Change workspace ..."
+# cd ..
+# echo "Change workspace ..."
+
+echo "Current workspace: ..."
 echo `pwd`
 
 export MODEL_PATH="/mnt2/share/huggingface_models/FLUX.1-dev"
 export DATASET_PATH="./example_images_filtered/${TRIGGER}"
 
 # -------------------------------------------------------------------------------------------
-export OUTPUT_DIR="./trained-flux-lora-exp8/data-v1/${TRIGGER}"
+export OUTPUT_DIR="./trained-flux-lora-exp7/data-v2/${TRIGGER}"
 
 export _MAX_STEPS=2000
 export _CKPT_STEPS=500
