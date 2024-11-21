@@ -18,10 +18,10 @@ export MODEL_PATH="/mnt2/share/huggingface_models/FLUX.1-dev"
 export DATASET_PATH="./example_images_filtered/${TRIGGER}"
 
 # -------------------------------------------------------------------------------------------
-export OUTPUT_DIR="./trained-flux-lora-exp11/data-v2/${TRIGGER}"
+export OUTPUT_DIR="./trained-flux-lora-exp11/data-v5/${TRIGGER}"
 
 export _MAX_STEPS=4000
-export _CKPT_STEPS=500
+export _CKPT_STEPS=250
 export _RESOLUTION=512 # dummy!!
 export _BATCH_SIZE=2
 # cuda-memory: 1024*1024*1 ~ 68GB
@@ -39,8 +39,8 @@ export _INSTANCE_PROMPT=$TRIGGER
 export _GUIDANCE_SCALE=1
 export _RANK=32
 
-export _LR_SCHEDULER=cosine_with_restarts
-# export _LR_SCHEDULER=constant_with_warmup
+# export _LR_SCHEDULER=cosine_with_restarts
+export _LR_SCHEDULER=constant_with_warmup
 
 # NOTICE:
 # hyperparameters
@@ -71,7 +71,7 @@ CUDA_VISIBLE_DEVICES=${CUDA_DEVICES} accelerate launch \
   --repeats=${_REPEATS} \
   --train_batch_size=${_BATCH_SIZE} \
   --guidance_scale=${_GUIDANCE_SCALE} \
-  --gradient_accumulation_steps=2 \
+  --gradient_accumulation_steps=1 \
   --rank=${_RANK} \
   --optimizer="adamw" \
   --use_8bit_adam \
