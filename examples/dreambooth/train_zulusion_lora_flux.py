@@ -88,7 +88,7 @@ if is_wandb_available():
 print(f" -- import modules, time: {time.perf_counter() - _TIC}")
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
-check_min_version("0.31.0.dev0")
+check_min_version("0.32.0.dev0")
 
 logger = get_logger(__name__)
 
@@ -193,7 +193,7 @@ def log_validation(
         f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
         f" {args.validation_prompt}."
     )
-    pipeline = pipeline.to(accelerator.device, dtype=torch_dtype)
+    pipeline = pipeline.to(accelerator.device)
     pipeline.set_progress_bar_config(disable=True)
 
     # run inference
@@ -404,7 +404,7 @@ def parse_args(input_args=None):
     )
     parser.add_argument(
         "--network_lora_target_modules",
-        choices=["attn_only", "attn_w_linear"],
+        choices=["attn_only", "attn_w_linear", "use_lora_layers"],
         default="attn_only", # diffusers defaults
         help=("To which modules we want to register low-rank adaptations on, default is attn for both text_encoder and transformer."),
     )
@@ -626,6 +626,23 @@ def parse_args(input_args=None):
     parser.add_argument("--adam_weight_decay", type=float, default=1e-04, help="Weight decay to use for unet params")
     parser.add_argument(
         "--adam_weight_decay_text_encoder", type=float, default=1e-03, help="Weight decay to use for text_encoder"
+    )
+
+    parser.add_argument(
+        "--lora_layers",
+        type=str,
+        default=None,
+        help=(
+            'The transformer modules to apply LoRA training on. Please specify the layers in a comma seperated. E.g. - "to_k,to_q,to_v,to_out.0" will result in lora training of attention layers only'
+        ),
+    )
+    parser.add_argument(
+        "--te1_lora_layers",
+        type=str,
+        default=None,
+        help=(
+            'The text_encoder_one modules to apply LoRA training on. Please specify the layers in a comma seperated. E.g. = "q_proj,k_proj,v_proj,out_proj" will result in lora training of attention layers only'
+        ),
     )
 
     parser.add_argument(
@@ -1239,7 +1256,6 @@ def encode_prompt(
     text_input_ids_list=None,
 ):
     prompt = [prompt] if isinstance(prompt, str) else prompt
-    batch_size = len(prompt)
     dtype = text_encoders[0].dtype
 
     pooled_prompt_embeds = _encode_prompt_with_clip(
@@ -1261,11 +1277,7 @@ def encode_prompt(
         text_input_ids=text_input_ids_list[1] if text_input_ids_list else None,
     )
 
-    # text_ids = torch.zeros(batch_size, prompt_embeds.shape[1], 3).to(device=device, dtype=dtype)
-    # text_ids = text_ids.repeat(num_images_per_prompt, 1, 1)
-
-    # FIXME: avoid warnings
-    text_ids = torch.zeros(prompt_embeds.shape[1], 3).to(device=device, dtype=dtype) 
+    text_ids = torch.zeros(prompt_embeds.shape[1], 3).to(device=device, dtype=dtype)
 
     return prompt_embeds, pooled_prompt_embeds, text_ids
 
@@ -1500,6 +1512,9 @@ def main(args):
             "attn.to_q", "attn.to_k", "attn.to_v", "attn.to_out.0",
             "attn.add_q_proj", "attn.add_k_proj", "attn.add_v_proj", "attn.to_add_out",
         ]
+    elif args.network_lora_target_modules == "use_lora_layers":
+        if args.lora_layers is not None:
+            transformer_lora_target_modules = [layer.strip() for layer in args.lora_layers.split(",")]
     transformer_lora_config = LoraConfig(
         r=args.rank,
         lora_alpha=args.rank,
@@ -1514,6 +1529,9 @@ def main(args):
                 "self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.out_proj",
                 "mlp.fc1", "mlp.fc2",
             ]
+        elif args.network_lora_target_modules == "use_lora_layers":
+            if args.te1_lora_layers is not None:
+                text_encoder_one_lora_target_modules = [layer.strip() for layer in args.te1_lora_layers.split(",")]
         text_lora_config = LoraConfig(
             r=args.rank,
             lora_alpha=args.rank,
@@ -1629,10 +1647,7 @@ def main(args):
             "weight_decay": args.adam_weight_decay_text_encoder,
             "lr": args.text_encoder_lr if args.text_encoder_lr else args.learning_rate,
         }
-        params_to_optimize = [
-            transformer_parameters_with_lr,
-            text_parameters_one_with_lr,
-        ]
+        params_to_optimize = [transformer_parameters_with_lr, text_parameters_one_with_lr]
     else:
         params_to_optimize = [transformer_parameters_with_lr]
 
@@ -1769,7 +1784,7 @@ def main(args):
 
     # Clear the memory here
     if not args.train_text_encoder and not train_dataset.custom_instance_prompts:
-        del tokenizers, text_encoders, text_encoder_one, text_encoder_two
+        del text_encoder_one, text_encoder_two, tokenizer_one, tokenizer_two
         free_memory()
 
     # If custom instance prompts are NOT provided (i.e. the instance prompt is used for all images),
@@ -2042,8 +2057,8 @@ def main(args):
 
                 latent_image_ids = _fn_prepare_latent_image_ids(
                     model_input.shape[0],
-                    model_input.shape[2],
-                    model_input.shape[3],
+                    model_input.shape[2] // 2,
+                    model_input.shape[3] // 2,
                     accelerator.device,
                     weight_dtype,
                 )
@@ -2117,8 +2132,8 @@ def main(args):
                 )[0]
                 model_pred = _fn_unpack_latents(
                     model_pred,
-                    height=int(model_input.shape[2] * vae_scale_factor / 2),
-                    width=int(model_input.shape[3] * vae_scale_factor / 2),
+                    height=model_input.shape[2] * vae_scale_factor,
+                    width=model_input.shape[3] * vae_scale_factor,
                     vae_scale_factor=vae_scale_factor,
                 )
 
