@@ -257,6 +257,12 @@ def parse_args(input_args=None):
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
     parser.add_argument(
+        "--pretrained_transformer_name_or_path",
+        type=str,
+        default=None,
+        help="Path to pretrained flux transformer (DiT) model or model identifier from huggingface.co/models.",
+    )
+    parser.add_argument(
         "--pretrained_controlnet_model_name_or_path",
         type=str,
         default=PRETRAINED_CONTROLNET_MODEL_PATH,
@@ -1426,10 +1432,15 @@ def main(args):
         revision=args.revision,
         variant=args.variant,
     )
-    transformer = FluxTransformer2DModel.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="transformer", revision=args.revision, variant=args.variant
-    )
-    transformer_config_guidance_embeds = transformer.config.guidance_embeds
+    if args.pretrained_transformer_name_or_path is None:
+        transformer = FluxTransformer2DModel.from_pretrained(
+            args.pretrained_model_name_or_path, subfolder="transformer", revision=args.revision, variant=args.variant
+        )
+    else:
+        # Load from transformer, e.g. InstantX/flux-dev-de-distill-diffusers
+        # https://huggingface.co/InstantX/flux-dev-de-distill-diffusers
+        transformer = FluxTransformer2DModel.from_pretrained(
+            args.pretrained_transformer_name_or_path)
 
     ### debug transformer class-type before & after accelerator
     if accelerator.is_main_process:
@@ -1703,17 +1714,14 @@ def main(args):
                 f" {args.text_encoder_lr} and learning_rate: {args.learning_rate}. "
                 f"When using prodigy only learning_rate is used as the initial learning rate."
             )
-            # # changes the learning rate of text_encoder_parameters_one and text_encoder_parameters_two to be
-            # # --learning_rate
-            # params_to_optimize[1]["lr"] = args.learning_rate
-            # params_to_optimize[2]["lr"] = args.learning_rate
+            # changes the learning rate of text_encoder_parameters_one to be
+            # --learning_rate
             for params in params_to_optimize[1:]:
                 # because there might be only text_encoder_one here (i.e. no text_encoder_two)
                 params["lr"] = args.learning_rate
 
         optimizer = optimizer_class(
             params_to_optimize,
-            lr=args.learning_rate,
             betas=(args.adam_beta1, args.adam_beta2),
             beta3=args.prodigy_beta3,
             weight_decay=args.adam_weight_decay,
@@ -2053,7 +2061,7 @@ def main(args):
                         width=model_conditioning_input.shape[3],
                     )
 
-                vae_scale_factor = 2 ** (len(vae_config_block_out_channels))
+                vae_scale_factor = 2 ** (len(vae_config_block_out_channels) - 1)
 
                 latent_image_ids = _fn_prepare_latent_image_ids(
                     model_input.shape[0],
@@ -2085,14 +2093,14 @@ def main(args):
 
                 packed_noisy_model_input = _fn_pack_latents(
                     noisy_model_input,
-                    batch_size=noisy_model_input.shape[0],
-                    num_channels_latents=noisy_model_input.shape[1],
-                    height=noisy_model_input.shape[2],
-                    width=noisy_model_input.shape[3],
+                    batch_size=model_input.shape[0],
+                    num_channels_latents=model_input.shape[1],
+                    height=model_input.shape[2],
+                    width=model_input.shape[3],
                 )
 
                 # handle guidance
-                if transformer_config_guidance_embeds:
+                if accelerator.unwrap_model(transformer).config.guidance_embeds:
                     guidance = torch.tensor([args.guidance_scale], device=accelerator.device)
                     guidance = guidance.expand(model_input.shape[0])
                 else:
@@ -2168,9 +2176,6 @@ def main(args):
                 if args.with_prior_preservation:
                     # Add the prior loss to the instance loss.
                     loss = loss + args.prior_loss_weight * prior_loss
-
-                ### debug
-                # print(f"loss: {loss}")
 
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
